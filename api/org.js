@@ -3,7 +3,6 @@
 //
 // Env vars required on Vercel:
 //   GHL_API_TOKEN   = a GoHighLevel Private Integration token (scopes: View Opportunities, View Custom Fields)
-//   CAL_TOKENS      = JSON map {"<sub-account locationId>":"<pit- calendar token>"} for appointments (optional)
 //   (LOCATION_ID is hardcoded to MAIN below; change if needed)
 //
 // Token: GHL → Settings → Private Integrations → Create → enable "View Opportunities" + "View Custom Fields" → copy.
@@ -119,17 +118,22 @@ function descendants(code,childrenByUp,seen){seen=seen||new Set();let out=[];(ch
 
 // --- Appointments: read from the agent's OWN sub-account calendar (per-account token) ---
 // CAL_TOKENS env var = JSON map {"<sub-account locationId>":"<pit- calendar token>", ...}
-function calTokenFor(location){ try{ const m=JSON.parse(process.env.CAL_TOKENS||"{}"); return m[location]||null; }catch(e){ return null; } }
+function calMap(){ try{ return JSON.parse(process.env.CAL_TOKENS||"{}"); }catch(e){ return {}; } }
+// Pick which sub-account calendar to read: explicit ?location wins; else, if exactly one token is
+// configured (pilot), use it so appointments work without passing ?location in the menu-link URL.
+function resolveCalLocation(location){ const m=calMap(); if(location&&m[location])return location; const keys=Object.keys(m); if(!location&&keys.length===1)return keys[0]; return location||null; }
+function calTokenFor(location){ const m=calMap(); return m[location]||null; }
 async function appointments(location){
-  const tok = calTokenFor(location);
-  if(!location || !tok) return {available:false, list:[]};
+  const loc = resolveCalLocation(location);
+  const tok = loc ? calTokenFor(loc) : null;
+  if(!loc || !tok) return {available:false, list:[]};
   let cals=[];
-  try{ const j=await ghl("/calendars/", {locationId:location}, tok); cals=j.calendars||j.calendar||[]; }catch(e){ return {available:false, list:[], error:String(e.message||e)}; }
+  try{ const j=await ghl("/calendars/", {locationId:loc}, tok); cals=j.calendars||j.calendar||[]; }catch(e){ return {available:false, list:[], error:String(e.message||e)}; }
   const now=Date.now(), startTime=now-7*86400000, endTime=now+60*86400000;
   const out=[];
   for(const c of cals.slice(0,15)){
     try{
-      const j=await ghl("/calendars/events", {locationId:location, calendarId:c.id, startTime, endTime}, tok);
+      const j=await ghl("/calendars/events", {locationId:loc, calendarId:c.id, startTime, endTime}, tok);
       (j.events||j.appointments||[]).forEach(e=>out.push({title:e.title||e.appointmentTitle||"(cita)", start:e.startTime||e.startTimeUtc||e.start||null, status:(e.appointmentStatus||e.status||"agendada"), calendar:c.name||""}));
     }catch(e){}
   }
