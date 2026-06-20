@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Mi Organización</title>
+<style>
+  :root{color-scheme:light;--navy:#0f2740;--teal:#1f9e8f;--bg:#f4f6f9;--card:#fff;--line:#e3e8ef;--ink:#13202e;--muted:#6b7a8d;--chip:#eef3f8;}
+  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
+  .wrap{max-width:900px;margin:0 auto;padding:18px 16px 60px}
+  h1{font-size:20px;margin:0 0 2px}.sub{color:var(--muted);font-size:13px;margin:0}
+  .me{font-weight:700;color:var(--navy);font-size:16px;margin-top:8px}
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:14px 0 4px}
+  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
+  .card .k{font-size:12px;color:var(--muted);margin-bottom:4px}.card .v{font-size:23px;font-weight:700;color:var(--navy)}
+  .card.points .v{color:var(--teal)}.card .hint{font-size:11px;color:var(--muted);margin-top:4px}
+  .phasebar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.pchip{font-size:11px;border-radius:20px;padding:3px 9px;background:var(--chip);color:#33455a}.pchip b{font-weight:800}
+  h2{font-size:15px;color:var(--navy);margin:20px 0 8px}
+  ul.tree{list-style:none;margin:0;padding:0}ul.tree ul{list-style:none;margin:0 0 0 10px;padding-left:18px;border-left:1px dashed var(--line)}
+  li.node{margin:4px 0}.row{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 10px}
+  .row .tog{cursor:pointer;width:18px;height:18px;border-radius:5px;border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);background:#fbfdff;flex:0 0 auto}
+  .row .tog.empty{visibility:hidden}.row .nm{font-weight:600}.row .cd{font-size:11px;color:var(--muted);background:var(--chip);padding:1px 6px;border-radius:6px}.row .cd.pend{color:#9a6a00;background:#fff3d6}.row .dl{font-size:11px;color:var(--muted)}
+  .stg{margin-left:auto;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
+  .stg.p1{color:#173a8a;background:#e4ecfd}.stg.p2{color:#4b1d95;background:#eee3fd}.stg.p3{color:#0c5a51;background:#dcf3ef}.stg.p4{color:#7a4d09;background:#fdeecb}.stg.lost{color:#7c2a1a;background:#f7e2dc}
+  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
+  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}th{background:#f7fafd;color:var(--muted);font-weight:600;font-size:12px}td.r{text-align:right;font-variant-numeric:tabular-nums}
+  .empty{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:20px;text-align:center;color:var(--muted)}
+  .err{background:#fff1f0;border:1px solid #f3c2bd;border-radius:12px;padding:16px;color:#7c2a1a}
+  .foot{font-size:12px;color:var(--muted);margin-top:16px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <h1>Mi Organización <span style="color:var(--teal)">— FENIX</span></h1>
+  <p class="sub">Tu downline · su avance de licenciamiento · pending business · puntos</p>
+  <div class="me" id="me">Cargando…</div>
+  <div id="content"></div>
+  <div class="foot" id="foot"></div>
+</div>
+<script>
+const P=new URLSearchParams(location.search);
+const qs = P.get("agent") ? "agent="+encodeURIComponent(P.get("agent")) : (P.get("email")?"email="+encodeURIComponent(P.get("email")):"");
+const money=n=>"$"+Math.round(n).toLocaleString("en-US");
+const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
+function badge(n){n=n||"";const phase= /Completada|Inforce|Completado/.test(n)?4:0; return n;}
+function stg(phase,stageName,status){if(status==="lost"||status==="abandoned")return '<span class="stg lost">'+(status==="lost"?"Caído":"Abandonado")+'</span>';return '<span class="stg p'+(phase||1)+'">'+esc(stageName||"—")+'</span>';}
+function nodes(list){if(!list||!list.length)return"";let h='<ul class="tree">';list.forEach((k,i)=>{const has=k.children&&k.children.length;const id="n"+Math.random().toString(36).slice(2);
+  h+='<li class="node"><div class="row"><span class="tog'+(has?'':' empty')+'" data-t="'+id+'">'+(has?'+':'')+'</span><span class="nm">'+esc(k.name)+'</span>'+(k.code?'<span class="cd">'+esc(k.code)+'</span>':'<span class="cd pend">cód. pendiente</span>')+(has?'<span class="dl">'+k.children.length+' ↓</span>':'')+stg(k.phase,k.stageName,k.status)+'</div>'+(has?'<div data-c="'+id+'" style="display:none">'+nodes(k.children)+'</div>':'')+'</li>';});return h+'</ul>';}
+async function load(){
+  if(!qs){document.getElementById("me").textContent="";document.getElementById("content").innerHTML='<div class="err">Falta la identidad del agente. Abre con <b>?agent=TUCODIGO</b> o <b>?email=tucorreo</b>.</div>';return;}
+  try{
+    const r=await fetch("/api/org?"+qs);const d=await r.json();
+    if(d.error){document.getElementById("me").textContent="";document.getElementById("content").innerHTML='<div class="err">'+esc(d.error)+'</div>';return;}
+    document.getElementById("me").textContent=d.agent.name+"  ("+d.agent.code+")";
+    const ph={1:0,2:0,3:0,4:0};(function w(l){l.forEach(k=>{if(ph[k.phase]!=null)ph[k.phase]++;if(k.children)w(k.children);});})(d.tree);
+    const pb=d.pendingBusiness;
+    let html='<div class="cards">'
+     +'<div class="card"><div class="k">Reclutas directos</div><div class="v">'+d.directCount+'</div></div>'
+     +'<div class="card"><div class="k">Downline total</div><div class="v">'+d.downlineCount+'</div><div class="hint">todos los niveles</div></div>'
+     +'<div class="card"><div class="k">Pólizas (Pending Business)</div><div class="v">'+pb.count+'</div></div>'
+     +'<div class="card points"><div class="k">Puntos del mes</div><div class="v">'+(pb.points>0?money(pb.points):"0")+'</div><div class="hint">'+(pb.points>0?"prima anualizada":"prima sin capturar")+'</div></div>'
+     +'</div>'
+     +'<div class="phasebar"><span class="pchip">1·Pre Licencia <b>'+ph[1]+'</b></span><span class="pchip">2·Tutorías <b>'+ph[2]+'</b></span><span class="pchip">3·Post Licencia <b>'+ph[3]+'</b></span><span class="pchip">4·Pending Business <b>'+ph[4]+'</b></span></div>'
+     +'<h2>Downline — avance de licenciamiento</h2>'+(d.tree.length?nodes(d.tree):'<div class="empty">Aún no tienes reclutas registrados con tu código como upline.</div>')
+     +'<h2>Pending Business — pólizas de mi organización</h2>';
+    if(!pb.policies.length)html+='<div class="empty">Ninguna póliza asignada a tu código o downline todavía.</div>';
+    else{pb.policies.sort((a,b)=>b.annual-a.annual);html+='<table><thead><tr><th>Póliza</th><th>Etapa</th><th class="r">Prima anual</th></tr></thead><tbody>'+pb.policies.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.stage)+'</td><td class="r">'+(p.annual>0?money(p.annual):"—")+'</td></tr>').join("")+'</tbody></table>';}
+    document.getElementById("content").innerHTML=html;
+    document.querySelectorAll(".tog").forEach(t=>{if(t.classList.contains("empty"))return;t.onclick=()=>{const b=document.querySelector('[data-c="'+t.dataset.t+'"]');if(!b)return;const s=b.style.display!=="none";b.style.display=s?"none":"block";t.textContent=s?"+":"−";};});
+    document.getElementById("foot").innerHTML="Datos en vivo desde MAIN vía Windsor · actualizado "+new Date(d.updatedAt).toLocaleString("es");
+  }catch(e){document.getElementById("content").innerHTML='<div class="err">Error cargando datos: '+esc(e.message||e)+'</div>';}
+}
+load();
+</script>
+</body>
+</html>
