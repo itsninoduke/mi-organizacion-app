@@ -118,7 +118,8 @@ function descendants(code,childrenByUp,seen){seen=seen||new Set();let out=[];(ch
 
 // --- Appointments: read from the agent's OWN sub-account calendar (per-account token) ---
 // CAL_TOKENS env var = JSON map {"<sub-account locationId>":"<pit- calendar token>", ...}
-function calMap(){ try{ return JSON.parse(process.env.CAL_TOKENS||"{}"); }catch(e){ return {}; } }
+// CAL_TOKENS = JSON map (multi-account). OR simplest pilot path: CAL_TOKEN (raw pit- token) + CAL_LOCATION (sub-account id).
+function calMap(){ let m={}; try{ m=JSON.parse(process.env.CAL_TOKENS||"{}"); }catch(e){ m={}; } if(process.env.CAL_TOKEN&&process.env.CAL_LOCATION){ m[process.env.CAL_LOCATION]=process.env.CAL_TOKEN; } return m; }
 // Pick which sub-account calendar to read: explicit ?location wins; else, if exactly one token is
 // configured (pilot), use it so appointments work without passing ?location in the menu-link URL.
 function resolveCalLocation(location){ const m=calMap(); if(location&&m[location])return location; const keys=Object.keys(m); if(!location&&keys.length===1)return keys[0]; return location||null; }
