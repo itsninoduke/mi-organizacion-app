@@ -39,13 +39,13 @@
 </div>
 <script>
 const P=new URLSearchParams(location.search);
-const qs = P.get("agent") ? "agent="+encodeURIComponent(P.get("agent")) : (P.get("email")?"email="+encodeURIComponent(P.get("email")):"");
+const qs = (P.get("agent") ? "agent="+encodeURIComponent(P.get("agent")) : (P.get("email")?"email="+encodeURIComponent(P.get("email")):"")) + (P.get("location")?"&location="+encodeURIComponent(P.get("location")):"");
 const money=n=>"$"+Math.round(n).toLocaleString("en-US");
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 function badge(n){n=n||"";const phase= /Completada|Inforce|Completado/.test(n)?4:0; return n;}
 function stg(phase,stageName,status){if(status==="lost"||status==="abandoned")return '<span class="stg lost">'+(status==="lost"?"Caído":"Abandonado")+'</span>';return '<span class="stg p'+(phase||1)+'">'+esc(stageName||"—")+'</span>';}
 function nodes(list){if(!list||!list.length)return"";let h='<ul class="tree">';list.forEach((k,i)=>{const has=k.children&&k.children.length;const id="n"+Math.random().toString(36).slice(2);
-  h+='<li class="node"><div class="row"><span class="tog'+(has?'':' empty')+'" data-t="'+id+'">'+(has?'+':'')+'</span><span class="nm">'+esc(k.name)+'</span>'+(k.code?'<span class="cd">'+esc(k.code)+'</span>':'<span class="cd pend">cód. pendiente</span>')+(has?'<span class="dl">'+k.children.length+' ↓</span>':'')+stg(k.phase,k.stageName,k.status)+'</div>'+(has?'<div data-c="'+id+'" style="display:none">'+nodes(k.children)+'</div>':'')+'</li>';});return h+'</ul>';}
+  h+='<li class="node"><div class="row"><span class="tog'+(has?'':' empty')+'" data-t="'+id+'">'+(has?'+':'')+'</span><span class="nm">'+esc(k.name)+'</span>'+(k.code?'<span class="cd">'+esc(k.code)+'</span>':'<span class="cd pend">cód. pendiente</span>')+(has?'<span class="dl">'+k.children.length+' ↓</span>':'')+(k.last?'<span class="dl">'+new Date(k.last).toLocaleDateString("es",{day:"2-digit",month:"short"})+'</span>':'')+stg(k.phase,k.stageName,k.status)+'</div>'+(has?'<div data-c="'+id+'" style="display:none">'+nodes(k.children)+'</div>':'')+'</li>';});return h+'</ul>';}
 async function load(){
   if(!qs){document.getElementById("me").textContent="";document.getElementById("content").innerHTML='<div class="err">Falta la identidad del agente. Abre con <b>?agent=TUCODIGO</b> o <b>?email=tucorreo</b>.</div>';return;}
   try{
@@ -54,20 +54,28 @@ async function load(){
     document.getElementById("me").textContent=d.agent.name+"  ("+d.agent.code+")";
     const ph={1:0,2:0,3:0,4:0};(function w(l){l.forEach(k=>{if(ph[k.phase]!=null)ph[k.phase]++;if(k.children)w(k.children);});})(d.tree);
     const pb=d.pendingBusiness;
+    const appts=(d.appointments&&d.appointments.list)||[]; const apptsAvail=d.appointments&&d.appointments.available;
     let html='<div class="cards">'
      +'<div class="card"><div class="k">Reclutas directos</div><div class="v">'+d.directCount+'</div></div>'
      +'<div class="card"><div class="k">Downline total</div><div class="v">'+d.downlineCount+'</div><div class="hint">todos los niveles</div></div>'
+     +'<div class="card"><div class="k">Citas próximas</div><div class="v">'+(apptsAvail?appts.length:"—")+'</div><div class="hint">tu calendario</div></div>'
      +'<div class="card"><div class="k">Pólizas (Pending Business)</div><div class="v">'+pb.count+'</div></div>'
      +'<div class="card points"><div class="k">Puntos del mes</div><div class="v">'+(pb.points>0?money(pb.points):"0")+'</div><div class="hint">'+(pb.points>0?"prima anualizada":"prima sin capturar")+'</div></div>'
      +'</div>'
      +'<div class="phasebar"><span class="pchip">1·Pre Licencia <b>'+ph[1]+'</b></span><span class="pchip">2·Tutorías <b>'+ph[2]+'</b></span><span class="pchip">3·Post Licencia <b>'+ph[3]+'</b></span><span class="pchip">4·Pending Business <b>'+ph[4]+'</b></span></div>'
+     +'<h2>Próximas Citas — tu calendario</h2>'
+     +(apptsAvail
+        ? (appts.length
+           ? '<table><thead><tr><th>Fecha</th><th>Cita</th><th>Estado</th></tr></thead><tbody>'+appts.map(a=>'<tr><td>'+esc(a.start?new Date(a.start).toLocaleString("es",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"—")+'</td><td>'+esc(a.title)+'</td><td>'+esc(a.status)+'</td></tr>').join("")+'</tbody></table>'
+           : '<div class="empty">No tienes citas en los próximos días.</div>')
+        : '<div class="empty">El calendario de esta cuenta aún no está conectado (falta su token de calendario).</div>')
      +'<h2>Downline — avance de licenciamiento</h2>'+(d.tree.length?nodes(d.tree):'<div class="empty">Aún no tienes reclutas registrados con tu código como upline.</div>')
      +'<h2>Pending Business — pólizas de mi organización</h2>';
     if(!pb.policies.length)html+='<div class="empty">Ninguna póliza asignada a tu código o downline todavía.</div>';
     else{pb.policies.sort((a,b)=>b.annual-a.annual);html+='<table><thead><tr><th>Póliza</th><th>Etapa</th><th class="r">Prima anual</th></tr></thead><tbody>'+pb.policies.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.stage)+'</td><td class="r">'+(p.annual>0?money(p.annual):"—")+'</td></tr>').join("")+'</tbody></table>';}
     document.getElementById("content").innerHTML=html;
     document.querySelectorAll(".tog").forEach(t=>{if(t.classList.contains("empty"))return;t.onclick=()=>{const b=document.querySelector('[data-c="'+t.dataset.t+'"]');if(!b)return;const s=b.style.display!=="none";b.style.display=s?"none":"block";t.textContent=s?"+":"−";};});
-    document.getElementById("foot").innerHTML="Datos en vivo desde MAIN vía Windsor · actualizado "+new Date(d.updatedAt).toLocaleString("es");
+    document.getElementById("foot").innerHTML="Datos en vivo desde GoHighLevel · actualizado "+new Date(d.updatedAt).toLocaleString("es");
   }catch(e){document.getElementById("content").innerHTML='<div class="err">Error cargando datos: '+esc(e.message||e)+'</div>';}
 }
 load();
