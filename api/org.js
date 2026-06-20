@@ -51,12 +51,16 @@ async function ghl(path, params){
   return r.json();
 }
 
-// fieldId -> role, by matching custom-field NAMES
+// fieldId -> role, by matching custom-field NAMES (fetch opportunity + contact models; ids are unique so merging is safe)
 async function fieldRoleMap(){
-  const j = await ghl("/locations/"+LOCATION_ID+"/customFields", {});
-  const list = j.customFields || j.customField || [];
   const map = {};
-  list.forEach(f=>{ const role = FIELD_ROLE[norm(f.name)]; if(role) map[f.id]=role; });
+  for(const model of ["opportunity","contact"]){
+    try{
+      const j = await ghl("/locations/"+LOCATION_ID+"/customFields", {model});
+      const list = j.customFields || j.customField || [];
+      list.forEach(f=>{ const role = FIELD_ROLE[norm(f.name)]; if(role) map[f.id]=role; });
+    }catch(e){}
+  }
   return map;
 }
 function readCF(opp, roleMap){
@@ -117,6 +121,19 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control","s-maxage=300, stale-while-revalidate=900");
   try{
     const url = new URL(req.url, "http://x");
+    if(url.searchParams.get("debug")){
+      const roleMap = await fieldRoleMap();
+      const opps = await allOpportunities();
+      const s = opps.find(o=>(o.customFields||o.customField||[]).length) || opps[0] || {};
+      return res.status(200).json({
+        oppCount: opps.length,
+        firstOppKeys: Object.keys(s),
+        cfLen: (s.customFields||s.customField||[]).length,
+        cfSample: (s.customFields||s.customField||[]).slice(0,4),
+        roleMapSize: Object.keys(roleMap).length,
+        pipelines: [...new Set(opps.map(o=>o.pipelineId||o.pipeline))].slice(0,8)
+      });
+    }
     let code = up(url.searchParams.get("agent")||"");
     const email = cl(url.searchParams.get("email")||"").toLowerCase();
     if(!code && email) code = up(EMAIL_TO_CODE[email]||"");
