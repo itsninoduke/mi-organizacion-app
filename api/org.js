@@ -3,6 +3,7 @@
 //
 // Env vars required on Vercel:
 //   GHL_API_TOKEN   = a GoHighLevel Private Integration token (scopes: View Opportunities, View Custom Fields)
+//   CAL_TOKENS      = JSON map {"<sub-account locationId>":"<pit- calendar token>"} for appointments (optional)
 //   (LOCATION_ID is hardcoded to MAIN below; change if needed)
 //
 // Token: GHL → Settings → Private Integrations → Create → enable "View Opportunities" + "View Custom Fields" → copy.
@@ -41,8 +42,8 @@ function isCode(s){const u=up(s);if(GARBAGE.has(u))return false;if(/\s/.test(u))
 function titleCase(s){s=cl(s);return s?s.toLowerCase().replace(/\b([a-záéíóúñ])/g,m=>m.toUpperCase()):s;}
 function cleanName(s){s=cl(s).replace(/\s*\|\|.*$/,"").trim();const m=s.match(/^(.*?)\s*-\s*\1$/i);if(m)s=m[1];if(!s||/^post\s*licens/i.test(s))return"";return s;}
 
-async function ghl(path, params){
-  const token = process.env.GHL_API_TOKEN;
+async function ghl(path, params, token){
+  token = token || process.env.GHL_API_TOKEN;
   if(!token) throw new Error("Missing GHL_API_TOKEN env var");
   const u = new URL(BASE+path);
   Object.entries(params||{}).forEach(([k,v])=>{ if(v!=null) u.searchParams.set(k,v); });
@@ -102,7 +103,7 @@ function buildGraph(opps, roleMap){
     if(upC)setName(upC,unRaw);
     if(ag){setName(ag,cleanName(oppName));stageByCode[ag]=stage;}
     if(upC && !(ag&&ag===upC)){
-      (childrenByUp[upC]=childrenByUp[upC]||[]).push({code:ag,name:cleanName(oppName)||"(nombre pendiente)",status,stage,key:"k"+i});
+      (childrenByUp[upC]=childrenByUp[upC]||[]).push({code:ag,name:cleanName(oppName)||"(nombre pendiente)",status,stage,last:o.lastStageChangeAt||o.updatedAt||o.lastStatusChangeAt||null,key:"k"+i});
     }
     // pending business (production)
     if((o.pipelineId||o.pipeline)===PB_PIPELINE){
@@ -115,6 +116,26 @@ function buildGraph(opps, roleMap){
   return {childrenByUp,nameByCode,stageByCode,pbByAgent};
 }
 function descendants(code,childrenByUp,seen){seen=seen||new Set();let out=[];(childrenByUp[code]||[]).forEach(k=>{out.push(k);if(k.code&&!seen.has(k.code)){seen.add(k.code);out=out.concat(descendants(k.code,childrenByUp,seen));}});return out;}
+
+// --- Appointments: read from the agent's OWN sub-account calendar (per-account token) ---
+// CAL_TOKENS env var = JSON map {"<sub-account locationId>":"<pit- calendar token>", ...}
+function calTokenFor(location){ try{ const m=JSON.parse(process.env.CAL_TOKENS||"{}"); return m[location]||null; }catch(e){ return null; } }
+async function appointments(location){
+  const tok = calTokenFor(location);
+  if(!location || !tok) return {available:false, list:[]};
+  let cals=[];
+  try{ const j=await ghl("/calendars/", {locationId:location}, tok); cals=j.calendars||j.calendar||[]; }catch(e){ return {available:false, list:[], error:String(e.message||e)}; }
+  const now=Date.now(), startTime=now-7*86400000, endTime=now+60*86400000;
+  const out=[];
+  for(const c of cals.slice(0,15)){
+    try{
+      const j=await ghl("/calendars/events", {locationId:location, calendarId:c.id, startTime, endTime}, tok);
+      (j.events||j.appointments||[]).forEach(e=>out.push({title:e.title||e.appointmentTitle||"(cita)", start:e.startTime||e.startTimeUtc||e.start||null, status:(e.appointmentStatus||e.status||"agendada"), calendar:c.name||""}));
+    }catch(e){}
+  }
+  out.sort((a,b)=> new Date(a.start||0)-new Date(b.start||0));
+  return {available:true, list:out.slice(0,50)};
+}
 
 module.exports = async (req, res) => {
   res.setHeader("Access-Control-Allow-Origin","*");
@@ -147,15 +168,17 @@ module.exports = async (req, res) => {
     const orgCodes = new Set([code]); all.forEach(d=>{if(d.code)orgCodes.add(d.code);});
     let policies=[]; orgCodes.forEach(c=>{(g.pbByAgent[c]||[]).forEach(p=>policies.push(p));});
     const points = policies.reduce((s,p)=>s+p.annual,0);
+    const appts = await appointments(cl(url.searchParams.get("location")||""));
     function tree(c, seen){seen=seen||new Set(); return (g.childrenByUp[c]||[]).map(k=>{
       const cs=new Set(seen); if(k.code)cs.add(k.code);
-      return {code:k.code,name:k.name,status:k.status,stageName:(STAGE[k.stage]||[0,"—"])[1],phase:(STAGE[k.stage]||[0])[0],children:tree(k.code,cs)};
+      return {code:k.code,name:k.name,status:k.status,stageName:(STAGE[k.stage]||[0,"—"])[1],phase:(STAGE[k.stage]||[0])[0],last:k.last||null,children:tree(k.code,cs)};
     });}
     res.status(200).json({
       agent:{code, name:g.nameByCode[code]||code},
       directCount:(g.childrenByUp[code]||[]).length,
       downlineCount:all.length,
       pendingBusiness:{count:policies.length, points, policies:policies.map(p=>({name:p.name,stage:(STAGE[p.stage]||[0,"—"])[1],annual:p.annual}))},
+      appointments:{available:appts.available, list:appts.list},
       tree: tree(code),
       updatedAt: new Date().toISOString()
     });
