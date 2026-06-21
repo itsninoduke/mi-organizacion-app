@@ -39,18 +39,43 @@
 </div>
 <script>
 const P=new URLSearchParams(location.search);
-const qs = (P.get("agent") ? "agent="+encodeURIComponent(P.get("agent")) : (P.get("email")?"email="+encodeURIComponent(P.get("email")):"")) + (P.get("location")?"&location="+encodeURIComponent(P.get("location")):"");
+const qs = (P.get("agent") ? "agent="+encodeURIComponent(P.get("agent")) : (P.get("email")?"email="+encodeURIComponent(P.get("email")):"")) + (P.get("location")?"&location="+encodeURIComponent(P.get("location")):"") + (P.get("name")?"&name="+encodeURIComponent(P.get("name")):"");
 const money=n=>"$"+Math.round(n).toLocaleString("en-US");
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
 function badge(n){n=n||"";const phase= /Completada|Inforce|Completado/.test(n)?4:0; return n;}
 function stg(phase,stageName,status){if(status==="lost"||status==="abandoned")return '<span class="stg lost">'+(status==="lost"?"Caído":"Abandonado")+'</span>';return '<span class="stg p'+(phase||1)+'">'+esc(stageName||"—")+'</span>';}
 function nodes(list){if(!list||!list.length)return"";let h='<ul class="tree">';list.forEach((k,i)=>{const has=k.children&&k.children.length;const id="n"+Math.random().toString(36).slice(2);
   h+='<li class="node"><div class="row"><span class="tog'+(has?'':' empty')+'" data-t="'+id+'">'+(has?'+':'')+'</span><span class="nm">'+esc(k.name)+'</span>'+(k.code?'<span class="cd">'+esc(k.code)+'</span>':'<span class="cd pend">cód. pendiente</span>')+(has?'<span class="dl">'+k.children.length+' ↓</span>':'')+(k.last?'<span class="dl">'+new Date(k.last).toLocaleDateString("es",{day:"2-digit",month:"short"})+'</span>':'')+stg(k.phase,k.stageName,k.status)+'</div>'+(has?'<div data-c="'+id+'" style="display:none">'+nodes(k.children)+'</div>':'')+'</li>';});return h+'</ul>';}
+function renderConnect(location,name){
+  document.getElementById("me").textContent = name ? ("Hola "+name) : "Conecta tu cuenta";
+  document.getElementById("content").innerHTML =
+    '<div class="empty" style="text-align:left;max-width:520px;margin:0 auto">'
+    +'<h2 style="margin:0 0 6px">Conecta tu cuenta</h2>'
+    +'<p style="color:var(--muted);margin:0 0 12px">Para ver <b>tu organización</b>, ingresa tu <b>código WFG</b> una sola vez. Queda vinculado a esta cuenta para siempre.</p>'
+    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
+    +'<input id="wfg" maxlength="8" placeholder="Tu código WFG (ej. 93OKH)" style="flex:1;min-width:200px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font-size:16px;text-transform:uppercase">'
+    +'<button id="cbtn" style="padding:11px 20px;border:0;border-radius:9px;background:var(--teal);color:#fff;font-weight:700;font-size:15px;cursor:pointer">Conectar</button>'
+    +'</div><div id="cmsg" style="margin-top:10px;font-size:13px;color:var(--muted);min-height:18px"></div></div>';
+  var btn=document.getElementById("cbtn"), inp=document.getElementById("wfg"), msg=document.getElementById("cmsg");
+  var submit=async function(){
+    var v=(inp.value||"").trim().toUpperCase();
+    if(!/^[A-Z0-9]{3,8}$/.test(v)){ msg.style.color="#7c2a1a"; msg.textContent="Código inválido: 3 a 8 letras o números."; return; }
+    btn.disabled=true; msg.style.color="var(--muted)"; msg.textContent="Conectando…";
+    try{
+      var r=await fetch("/api/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({locationId:location,wfgCode:v,locationName:name})});
+      var d=await r.json();
+      if(d&&d.ok){ msg.style.color="var(--teal)"; msg.textContent="¡Listo! Cargando tu organización…"; setTimeout(load,700); }
+      else { msg.style.color="#7c2a1a"; msg.textContent=(d&&d.error)||"No se pudo conectar."; btn.disabled=false; }
+    }catch(e){ msg.style.color="#7c2a1a"; msg.textContent="Error: "+(e.message||e); btn.disabled=false; }
+  };
+  btn.onclick=submit; inp.addEventListener("keydown",function(e){if(e.key==="Enter")submit();}); inp.focus();
+}
 async function load(){
   if(!qs){document.getElementById("me").textContent="";document.getElementById("content").innerHTML='<div class="err">Falta la identidad del agente. Abre con <b>?agent=TUCODIGO</b> o <b>?email=tucorreo</b>.</div>';return;}
   try{
     const r=await fetch("/api/org?"+qs);const d=await r.json();
     if(d.error){document.getElementById("me").textContent="";document.getElementById("content").innerHTML='<div class="err">'+esc(d.error)+'</div>';return;}
+    if(d.needConnect){renderConnect(d.location||P.get("location")||"", d.locationName||P.get("name")||"");return;}
     document.getElementById("me").textContent=d.agent.name+"  ("+d.agent.code+")";
     const ph={1:0,2:0,3:0,4:0};(function w(l){l.forEach(k=>{if(ph[k.phase]!=null)ph[k.phase]++;if(k.children)w(k.children);});})(d.tree);
     const pb=d.pendingBusiness;
