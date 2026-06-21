@@ -185,14 +185,6 @@ module.exports = async (req, res) => {
   try{
     const url = new URL(req.url, "http://x");
     const location = cl(url.searchParams.get("location")||"");
-    if(url.searchParams.get("debug")==="airtable"){
-      const tok=process.env.AIRTABLE_TOKEN;
-      const f=encodeURIComponent("{locationId}='"+location.replace(/'/g,"")+"'");
-      const out={hasToken:!!tok, base:AIRTABLE_BASE, table:AIRTABLE_TABLE};
-      try{ const r=await fetch("https://api.airtable.com/v0/"+AIRTABLE_BASE+"/"+encodeURIComponent(AIRTABLE_TABLE)+"?filterByFormula="+f+"&maxRecords=3",{headers:{Authorization:"Bearer "+tok}}); out.status=r.status; out.body=(await r.text()).slice(0,300); }catch(e){ out.err=String(e.message||e); }
-      res.setHeader("Cache-Control","no-store");
-      return res.status(200).json(out);
-    }
     let code = up(url.searchParams.get("agent")||"");
     const email = cl(url.searchParams.get("email")||"").toLowerCase();
     if(!isCode(code) && email) code = up(EMAIL_TO_CODE[email]||"");
