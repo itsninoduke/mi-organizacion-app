@@ -11,6 +11,8 @@ const BASE = "https://services.leadconnectorhq.com";
 const LOCATION_ID = "sJ0hdWs52NA4OYKQ3F6m";          // MAIN (Alexander Navarro LLC)
 const PB_PIPELINE = "cpl1UI5SIq0n1bJyLcZ2";          // 4. Pending Bussiness
 const VERSION = "2021-07-28";
+const AIRTABLE_BASE = "appOImTsXsTEPWADA";   // "FENIX Mi Organizacion" base
+const AIRTABLE_TABLE = "agents";             // directory: locationId -> wfgCode (agents self-connect)
 
 // GHL login email -> WFG code (fill for pilot agents, lowercase email).
 const EMAIL_TO_CODE = {
@@ -54,6 +56,20 @@ async function ghl(path, params, token){
   const r = await fetch(u.toString(), {headers:{Authorization:"Bearer "+token, Version:VERSION, Accept:"application/json"}});
   if(!r.ok) throw new Error("GHL "+path+" "+r.status+" "+(await r.text()).slice(0,200));
   return r.json();
+}
+
+// Agent directory (Airtable): resolve a sub-account locationId -> the agent's WFG code.
+// Populated automatically when an agent self-connects (see /api/connect).
+async function codeFromLocation(location){
+  const tok = process.env.AIRTABLE_TOKEN; if(!tok || !location) return null;
+  try{
+    const f = encodeURIComponent("{locationId}='"+String(location).replace(/'/g,"")+"'");
+    const r = await fetch("https://api.airtable.com/v0/"+AIRTABLE_BASE+"/"+encodeURIComponent(AIRTABLE_TABLE)+"?filterByFormula="+f+"&maxRecords=1", {headers:{Authorization:"Bearer "+tok}});
+    if(!r.ok) return null;
+    const j = await r.json();
+    const rec = j && j.records && j.records[0];
+    return rec ? (rec.fields.wfgCode||null) : null;
+  }catch(e){ return null; }
 }
 
 // fieldId -> role, by matching custom-field NAMES (fetch opportunity + contact models; ids are unique so merging is safe)
@@ -168,10 +184,15 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control","s-maxage=300, stale-while-revalidate=900");
   try{
     const url = new URL(req.url, "http://x");
+    const location = cl(url.searchParams.get("location")||"");
     let code = up(url.searchParams.get("agent")||"");
     const email = cl(url.searchParams.get("email")||"").toLowerCase();
-    if(!code && email) code = up(EMAIL_TO_CODE[email]||"");
-    if(!isCode(code)) return res.status(400).json({error:"Pasa ?agent=<WFG_CODE> o ?email=<correo del agente> (mapeado en EMAIL_TO_CODE)."});
+    if(!isCode(code) && email) code = up(EMAIL_TO_CODE[email]||"");
+    if(!isCode(code) && location) code = up(await codeFromLocation(location)||"");
+    if(!isCode(code)){
+      if(location){ res.setHeader("Cache-Control","no-store"); return res.status(200).json({needConnect:true, location, locationName: cl(url.searchParams.get("name")||"")}); }
+      return res.status(400).json({error:"Pasa ?agent=<WFG_CODE>, ?email=<correo>, o ?location=<id> (embebe el menú con ?location={{location.id}})."});
+    }
 
     const roleMap = await fieldRoleMap();
     const opps = await allOpportunities();
