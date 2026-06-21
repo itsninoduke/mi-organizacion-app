@@ -24,7 +24,8 @@ const FIELD_ROLE = {
   "codigo del agente principal": "writingAgent",   // PRIMARY writing agent on a policy (56/57 policies)
   "codigo de agente": "writingAgentAlt",           // secondary/legacy writing-agent field (16/57)
   "prima mensual": "primaMensual",
-  "target o prima anualizada": "primaAnual"
+  "target o prima anualizada": "primaAnual",
+  "target premium": "primaAnual"                    // contact field (policy form) — annualized premium
 };
 
 const STAGE = {
@@ -41,6 +42,9 @@ const norm = s => cl(s).toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g,"").re
 function isCode(s){const u=up(s);if(GARBAGE.has(u))return false;if(/\s/.test(u))return false;if(/^X+\d*$/.test(u))return false;if(/^N\/?A$/.test(u))return false;return /^[A-Z0-9]{3,8}$/.test(u);}
 function titleCase(s){s=cl(s);return s?s.toLowerCase().replace(/\b([a-záéíóúñ])/g,m=>m.toUpperCase()):s;}
 function cleanName(s){s=cl(s).replace(/\s*\|\|.*$/,"").trim();const m=s.match(/^(.*?)\s*-\s*\1$/i);if(m)s=m[1];if(!s||/^post\s*licens/i.test(s))return"";return s;}
+function parseNum(v){ if(v==null)return 0; const n=parseFloat(String(v).replace(/[^0-9.]/g,"")); return isFinite(n)?n:0; }
+// annualized premium: prefer the annual field; else parse the monthly field (×12 unless its text says "anual")
+function annualFrom(anualVal, mensualVal){ const a=parseNum(anualVal); if(a>0)return a; const ms=String(mensualVal==null?"":mensualVal); const m=parseNum(ms); if(m>0)return /anual|annual|year|a[nñ]o/i.test(ms)?m:m*12; return 0; }
 
 async function ghl(path, params, token){
   token = token || process.env.GHL_API_TOKEN;
@@ -108,14 +112,30 @@ function buildGraph(opps, roleMap){
     // pending business (production)
     if((o.pipelineId||o.pipeline)===PB_PIPELINE){
       const wa = isCode(cf.writingAgent)?up(cf.writingAgent):(isCode(cf.writingAgentAlt)?up(cf.writingAgentAlt):null);
-      const mensual=+cf.primaMensual||0, anual=+cf.primaAnual||0;
-      const annual = anual>0?anual:mensual*12;
-      if(wa)(pbByAgent[wa]=pbByAgent[wa]||[]).push({name:cleanName(oppName)||"(póliza)",stage,status,annual});
+      const annual = annualFrom(cf.primaAnual, cf.primaMensual);
+      const cid = o.contactId||(o.contact&&o.contact.id)||null;
+      if(wa)(pbByAgent[wa]=pbByAgent[wa]||[]).push({name:cleanName(oppName)||"(póliza)",stage,status,annual,contactId:cid});
     }
   });
   return {childrenByUp,nameByCode,stageByCode,pbByAgent};
 }
 function descendants(code,childrenByUp,seen){seen=seen||new Set();let out=[];(childrenByUp[code]||[]).forEach(k=>{out.push(k);if(k.code&&!seen.has(k.code)){seen.add(k.code);out=out.concat(descendants(k.code,childrenByUp,seen));}});return out;}
+
+// Premium is captured by the policy form on the CONTACT (fields "Target premium" / "Prima mensual"),
+// not on the opportunity. For policies with no annual amount, read it from the linked contact.
+// Requires the GHL token to also carry the "View Contacts" scope (else these calls 401 and points stay 0).
+async function fillPremiumFromContacts(policies, roleMap){
+  const targets = policies.filter(p=>(!p.annual||p.annual<=0)&&p.contactId).slice(0,40);
+  for(const p of targets){
+    try{
+      const j = await ghl("/contacts/"+p.contactId);
+      const c = j.contact||j;
+      const cf = readCF({customFields:c.customFields||c.customField||[]}, roleMap);
+      const annual = annualFrom(cf.primaAnual, cf.primaMensual);
+      if(annual>0) p.annual = annual;
+    }catch(e){}
+  }
+}
 
 // --- Appointments: read from the agent's OWN sub-account calendar (per-account token) ---
 // CAL_TOKENS env var = JSON map {"<sub-account locationId>":"<pit- calendar token>", ...}
@@ -203,6 +223,7 @@ module.exports = async (req, res) => {
     const all = descendants(code, g.childrenByUp);
     const orgCodes = new Set([code]); all.forEach(d=>{if(d.code)orgCodes.add(d.code);});
     let policies=[]; orgCodes.forEach(c=>{(g.pbByAgent[c]||[]).forEach(p=>policies.push(p));});
+    await fillPremiumFromContacts(policies, roleMap);
     const points = policies.reduce((s,p)=>s+p.annual,0);
     const appts = await appointments(cl(url.searchParams.get("location")||""));
     function tree(c, seen){seen=seen||new Set(); return (g.childrenByUp[c]||[]).map(k=>{
