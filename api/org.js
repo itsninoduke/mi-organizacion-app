@@ -147,9 +147,27 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control","s-maxage=300, stale-while-revalidate=900");
   try{
     const url = new URL(req.url, "http://x");
-    if(url.searchParams.get("debug")){
-      const roleMap = await fieldRoleMap();
+    const dbg = url.searchParams.get("debug");
+    if(dbg){
       const opps = await allOpportunities();
+      const idName = {};
+      for(const model of ["opportunity","contact"]){
+        try{ const j=await ghl("/locations/"+LOCATION_ID+"/customFields",{model}); (j.customFields||j.customField||[]).forEach(f=>{ idName[f.id]=model[0]+":"+f.name; }); }catch(e){}
+      }
+      const cfVal=c=> String((c.fieldValue!=null?c.fieldValue:(c.fieldValueString!=null?c.fieldValueString:c.value))??"").slice(0,45);
+      if(dbg==="fields"){ return res.status(200).json({fields:Object.values(idName).sort()}); }
+      if(dbg==="pb"){
+        const pb = opps.filter(o=>(o.pipelineId||o.pipeline)===PB_PIPELINE);
+        const freq={};
+        pb.forEach(o=>(o.customFields||o.customField||[]).forEach(c=>{const n=idName[c.id]||c.id; freq[n]=(freq[n]||0)+1;}));
+        pb.sort((a,b)=> new Date(b.createdAt||b.dateAdded||0)-new Date(a.createdAt||a.dateAdded||0));
+        const recentSample = pb.slice(0,6).map(o=>({
+          name:o.name, created:o.createdAt||o.dateAdded||null,
+          cf:(o.customFields||o.customField||[]).map(c=>({name:idName[c.id]||c.id, val:cfVal(c)}))
+        }));
+        return res.status(200).json({pbCount:pb.length, fieldFrequency:freq, recentSample});
+      }
+      const roleMap = await fieldRoleMap();
       const s = opps.find(o=>(o.customFields||o.customField||[]).length) || opps[0] || {};
       return res.status(200).json({
         oppCount: opps.length,
