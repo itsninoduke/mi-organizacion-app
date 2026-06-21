@@ -168,49 +168,6 @@ module.exports = async (req, res) => {
   res.setHeader("Cache-Control","s-maxage=300, stale-while-revalidate=900");
   try{
     const url = new URL(req.url, "http://x");
-    const dbg = url.searchParams.get("debug");
-    if(dbg){
-      const opps = await allOpportunities();
-      const idName = {};
-      for(const model of ["opportunity","contact"]){
-        try{ const j=await ghl("/locations/"+LOCATION_ID+"/customFields",{model}); (j.customFields||j.customField||[]).forEach(f=>{ idName[f.id]=model[0]+":"+f.name; }); }catch(e){}
-      }
-      const cfVal=c=> String((c.fieldValue!=null?c.fieldValue:(c.fieldValueString!=null?c.fieldValueString:c.value))??"").slice(0,45);
-      if(dbg==="fields"){ return res.status(200).json({fields:Object.values(idName).sort()}); }
-      if(dbg==="pb"){
-        const pb = opps.filter(o=>(o.pipelineId||o.pipeline)===PB_PIPELINE);
-        const freq={};
-        pb.forEach(o=>(o.customFields||o.customField||[]).forEach(c=>{const n=idName[c.id]||c.id; freq[n]=(freq[n]||0)+1;}));
-        pb.sort((a,b)=> new Date(b.createdAt||b.dateAdded||0)-new Date(a.createdAt||a.dateAdded||0));
-        const recentSample = pb.slice(0,6).map(o=>({
-          name:o.name, created:o.createdAt||o.dateAdded||null,
-          cf:(o.customFields||o.customField||[]).map(c=>({name:idName[c.id]||c.id, val:cfVal(c)}))
-        }));
-        return res.status(200).json({pbCount:pb.length, fieldFrequency:freq, recentSample});
-      }
-      if(dbg==="contact"){
-        const pb = opps.filter(o=>(o.pipelineId||o.pipeline)===PB_PIPELINE);
-        pb.sort((a,b)=> new Date(b.createdAt||b.dateAdded||0)-new Date(a.createdAt||a.dateAdded||0));
-        const out=[];
-        for(const o of pb.slice(0,6)){
-          const cid = o.contactId || (o.contact&&o.contact.id);
-          let cf=[];
-          if(cid){ try{ const j=await ghl("/contacts/"+cid); const c=j.contact||j; cf=(c.customFields||c.customField||[]).map(x=>({name:idName[x.id]||x.id, val:cfVal(x)})).filter(x=>/prima|premium|target|agent|codigo|wfg|smd/i.test(x.name)); }catch(e){ cf=[{err:String(e.message||e).slice(0,80)}]; } }
-          out.push({opp:o.name, contactId:cid||null, cf});
-        }
-        return res.status(200).json({sample:out});
-      }
-      const roleMap = await fieldRoleMap();
-      const s = opps.find(o=>(o.customFields||o.customField||[]).length) || opps[0] || {};
-      return res.status(200).json({
-        oppCount: opps.length,
-        firstOppKeys: Object.keys(s),
-        cfLen: (s.customFields||s.customField||[]).length,
-        cfSample: (s.customFields||s.customField||[]).slice(0,4),
-        roleMapSize: Object.keys(roleMap).length,
-        pipelines: [...new Set(opps.map(o=>o.pipelineId||o.pipeline))].slice(0,8)
-      });
-    }
     let code = up(url.searchParams.get("agent")||"");
     const email = cl(url.searchParams.get("email")||"").toLowerCase();
     if(!code && email) code = up(EMAIL_TO_CODE[email]||"");
