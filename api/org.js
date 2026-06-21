@@ -21,7 +21,8 @@ const FIELD_ROLE = {
   "wfg codigo de agente": "agent",          // recruit's own WFG code (recruiting opp)
   "codigo del agente upline": "uplineCode",
   "nombre del agente upline": "uplineName",
-  "codigo de agente": "writingAgent",       // writing agent on a policy (Pending Business)
+  "codigo del agente principal": "writingAgent",   // PRIMARY writing agent on a policy (56/57 policies)
+  "codigo de agente": "writingAgentAlt",           // secondary/legacy writing-agent field (16/57)
   "prima mensual": "primaMensual",
   "target o prima anualizada": "primaAnual"
 };
@@ -106,7 +107,7 @@ function buildGraph(opps, roleMap){
     }
     // pending business (production)
     if((o.pipelineId||o.pipeline)===PB_PIPELINE){
-      const wa = isCode(cf.writingAgent)?up(cf.writingAgent):null;
+      const wa = isCode(cf.writingAgent)?up(cf.writingAgent):(isCode(cf.writingAgentAlt)?up(cf.writingAgentAlt):null);
       const mensual=+cf.primaMensual||0, anual=+cf.primaAnual||0;
       const annual = anual>0?anual:mensual*12;
       if(wa)(pbByAgent[wa]=pbByAgent[wa]||[]).push({name:cleanName(oppName)||"(póliza)",stage,status,annual});
@@ -166,6 +167,18 @@ module.exports = async (req, res) => {
           cf:(o.customFields||o.customField||[]).map(c=>({name:idName[c.id]||c.id, val:cfVal(c)}))
         }));
         return res.status(200).json({pbCount:pb.length, fieldFrequency:freq, recentSample});
+      }
+      if(dbg==="contact"){
+        const pb = opps.filter(o=>(o.pipelineId||o.pipeline)===PB_PIPELINE);
+        pb.sort((a,b)=> new Date(b.createdAt||b.dateAdded||0)-new Date(a.createdAt||a.dateAdded||0));
+        const out=[];
+        for(const o of pb.slice(0,6)){
+          const cid = o.contactId || (o.contact&&o.contact.id);
+          let cf=[];
+          if(cid){ try{ const j=await ghl("/contacts/"+cid); const c=j.contact||j; cf=(c.customFields||c.customField||[]).map(x=>({name:idName[x.id]||x.id, val:cfVal(x)})).filter(x=>/prima|premium|target|agent|codigo|wfg|smd/i.test(x.name)); }catch(e){ cf=[{err:String(e.message||e).slice(0,80)}]; } }
+          out.push({opp:o.name, contactId:cid||null, cf});
+        }
+        return res.status(200).json({sample:out});
       }
       const roleMap = await fieldRoleMap();
       const s = opps.find(o=>(o.customFields||o.customField||[]).length) || opps[0] || {};
