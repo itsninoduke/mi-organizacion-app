@@ -4,104 +4,221 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Mi Organización</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.js"></script>
 <style>
-  :root{color-scheme:light;--navy:#0f2740;--teal:#1f9e8f;--bg:#f4f6f9;--card:#fff;--line:#e3e8ef;--ink:#13202e;--muted:#6b7a8d;--chip:#eef3f8;}
-  *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.45 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif}
-  .wrap{max-width:900px;margin:0 auto;padding:18px 16px 60px}
-  h1{font-size:20px;margin:0 0 2px}.sub{color:var(--muted);font-size:13px;margin:0}
-  .me{font-weight:700;color:var(--navy);font-size:16px;margin-top:8px}
-  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(140px,1fr));gap:10px;margin:14px 0 4px}
-  .card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:12px 14px}
-  .card .k{font-size:12px;color:var(--muted);margin-bottom:4px}.card .v{font-size:23px;font-weight:700;color:var(--navy)}
-  .card.points .v{color:var(--teal)}.card .hint{font-size:11px;color:var(--muted);margin-top:4px}
-  .phasebar{display:flex;gap:6px;flex-wrap:wrap;margin:8px 0}.pchip{font-size:11px;border-radius:20px;padding:3px 9px;background:var(--chip);color:#33455a}.pchip b{font-weight:800}
-  h2{font-size:15px;color:var(--navy);margin:20px 0 8px}
-  ul.tree{list-style:none;margin:0;padding:0}ul.tree ul{list-style:none;margin:0 0 0 10px;padding-left:18px;border-left:1px dashed var(--line)}
-  li.node{margin:4px 0}.row{display:flex;align-items:center;gap:8px;background:var(--card);border:1px solid var(--line);border-radius:10px;padding:7px 10px}
-  .row .tog{cursor:pointer;width:18px;height:18px;border-radius:5px;border:1px solid var(--line);display:inline-flex;align-items:center;justify-content:center;font-size:12px;color:var(--muted);background:#fbfdff;flex:0 0 auto}
-  .row .tog.empty{visibility:hidden}.row .nm{font-weight:600}.row .cd{font-size:11px;color:var(--muted);background:var(--chip);padding:1px 6px;border-radius:6px}.row .cd.pend{color:#9a6a00;background:#fff3d6}.row .dl{font-size:11px;color:var(--muted)}
-  .stg{margin-left:auto;font-size:11px;font-weight:700;padding:2px 9px;border-radius:20px;white-space:nowrap}
-  .stg.p1{color:#173a8a;background:#e4ecfd}.stg.p2{color:#4b1d95;background:#eee3fd}.stg.p3{color:#0c5a51;background:#dcf3ef}.stg.p4{color:#7a4d09;background:#fdeecb}.stg.lost{color:#7c2a1a;background:#f7e2dc}
-  table{width:100%;border-collapse:collapse;background:var(--card);border:1px solid var(--line);border-radius:12px;overflow:hidden}
-  th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);font-size:13px}th{background:#f7fafd;color:var(--muted);font-weight:600;font-size:12px}td.r{text-align:right;font-variant-numeric:tabular-nums}
-  .empty{background:var(--card);border:1px dashed var(--line);border-radius:12px;padding:20px;text-align:center;color:var(--muted)}
-  .err{background:#fff1f0;border:1px solid #f3c2bd;border-radius:12px;padding:16px;color:#7c2a1a}
-  .foot{font-size:12px;color:var(--muted);margin-top:16px}
+  :root{
+    --bg:#0a0e17;--tx:#e9eef7;--mut:#8a99b0;--dim:#5d6b81;
+    --panel:rgba(255,255,255,.045);--panel2:rgba(255,255,255,.08);--bd:rgba(255,255,255,.10);--bd2:rgba(255,255,255,.20);
+    --teal:#2ee6c0;--teal2:#16b896;--tglow:rgba(46,230,192,.22);
+    --blue:#4aa3ff;--purple:#9d8bff;--amber:#f4b740;--red:#ff6b6b;--green:#43d9a3;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0}
+  body{background:radial-gradient(1100px 620px at 78% -12%,#16273f 0%,rgba(14,22,38,0) 60%),radial-gradient(900px 500px at 0% 0%,#10202e 0%,rgba(10,14,23,0) 55%),var(--bg);background-attachment:fixed;color:var(--tx);font:15px/1.5 -apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;-webkit-font-smoothing:antialiased;min-height:100vh}
+  .wrap{max-width:1040px;margin:0 auto;padding:24px 18px 80px}
+  a{color:var(--teal)}
+  .reveal{opacity:0;transform:translateY(12px);animation:fadeUp .55s cubic-bezier(.2,.7,.2,1) forwards}
+  @keyframes fadeUp{to{opacity:1;transform:none}}
+  @keyframes pulse{0%{box-shadow:0 0 0 0 var(--tglow)}70%{box-shadow:0 0 0 7px rgba(46,230,192,0)}100%{box-shadow:0 0 0 0 rgba(46,230,192,0)}}
+  @keyframes shimmer{100%{background-position:900px 0}}
+  /* header */
+  .top{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;margin-bottom:6px}
+  .brand{font-size:13px;letter-spacing:.14em;text-transform:uppercase;color:var(--mut)}
+  .brand b{color:var(--teal);font-weight:700}
+  .who{display:flex;align-items:center;gap:13px;margin:10px 0 2px}
+  .ava{width:48px;height:48px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;color:#04140f;background:linear-gradient(135deg,var(--teal),var(--teal2));box-shadow:0 6px 22px var(--tglow)}
+  .who h1{font-size:21px;margin:0;font-weight:700;letter-spacing:-.01em}
+  .who .sub{font-size:13px;color:var(--mut);margin-top:1px}
+  .live{display:inline-flex;align-items:center;gap:7px;font-size:12px;color:var(--teal);background:rgba(46,230,192,.08);border:1px solid rgba(46,230,192,.25);padding:6px 12px;border-radius:30px}
+  .live .dot{width:7px;height:7px;border-radius:50%;background:var(--teal);animation:pulse 2s infinite}
+  .insight{display:flex;align-items:center;gap:8px;color:var(--mut);font-size:13.5px;margin:14px 0 20px;padding:11px 14px;background:var(--panel);border:1px solid var(--bd);border-radius:12px}
+  .insight i{color:var(--teal)}
+  .insight b{color:var(--tx);font-weight:600}
+  /* cards */
+  .cards{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:13px;margin-bottom:18px}
+  .card{background:var(--panel);border:1px solid var(--bd);border-radius:16px;padding:15px 16px;backdrop-filter:blur(10px);transition:transform .25s ease,border-color .25s ease,box-shadow .25s ease}
+  .card:hover{transform:translateY(-3px);border-color:var(--bd2)}
+  .kpi .k{font-size:12.5px;color:var(--mut);display:flex;align-items:center;gap:6px;margin-bottom:9px}
+  .kpi .v{font-size:27px;font-weight:700;letter-spacing:-.02em;font-variant-numeric:tabular-nums}
+  .kpi .hint{font-size:11px;color:var(--dim);margin-top:3px}
+  .kpi.points{border-color:rgba(46,230,192,.4);box-shadow:0 0 26px -8px var(--tglow);background:linear-gradient(180deg,rgba(46,230,192,.10),rgba(46,230,192,.02))}
+  .kpi.points .v{color:var(--teal)}
+  .kpi.points:hover{box-shadow:0 0 40px -8px var(--tglow)}
+  .ic{width:24px;height:24px;border-radius:7px;background:rgba(255,255,255,.06);display:inline-flex;align-items:center;justify-content:center;font-size:13px}
+  /* sections */
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:18px}
+  @media(max-width:720px){.grid2{grid-template-columns:1fr}}
+  h2{font-size:13px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);margin:0 0 12px;font-weight:600}
+  .panel{background:var(--panel);border:1px solid var(--bd);border-radius:16px;padding:16px 17px;backdrop-filter:blur(10px)}
+  .legend{font-size:13px;display:flex;flex-direction:column;gap:9px}
+  .legend span{display:flex;align-items:center;gap:8px}
+  .legend i{width:10px;height:10px;border-radius:3px;display:inline-block;flex:0 0 auto}
+  .legend b{margin-left:auto;font-weight:600;font-variant-numeric:tabular-nums}
+  /* recruit rows */
+  .rows{display:flex;flex-direction:column;gap:9px}
+  .row{background:var(--panel);border:1px solid var(--bd);border-radius:13px;padding:11px 13px;transition:transform .25s ease,border-color .25s ease}
+  .row:hover{transform:translateY(-2px);border-color:var(--bd2)}
+  .rtop{display:flex;align-items:center;gap:11px}
+  .rava{width:36px;height:36px;border-radius:50%;background:rgba(255,255,255,.06);border:1px solid var(--bd);display:flex;align-items:center;justify-content:center;font-size:12.5px;font-weight:600;color:var(--mut);flex:0 0 auto}
+  .rname{font-weight:600;font-size:14.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .rmeta{font-size:12px;color:var(--dim);margin-top:1px}
+  .badge{margin-left:auto;font-size:11.5px;font-weight:600;padding:4px 11px;border-radius:30px;white-space:nowrap}
+  .seg{display:flex;gap:5px;margin-top:10px}
+  .seg .cell{height:5px;flex:1;border-radius:4px;background:rgba(255,255,255,.08);overflow:hidden;position:relative}
+  .seg .cell .fill{position:absolute;inset:0;border-radius:4px;transform:scaleX(0);transform-origin:left;animation:grow .6s ease forwards}
+  @keyframes grow{to{transform:scaleX(1)}}
+  .kids{margin:8px 0 0 16px;padding-left:14px;border-left:1px dashed var(--bd)}
+  .tog{cursor:pointer;color:var(--mut);font-size:12px;user-select:none;margin-left:6px}
+  /* table */
+  table{width:100%;border-collapse:collapse}
+  th,td{text-align:left;padding:10px 12px;font-size:13.5px;border-bottom:1px solid var(--bd)}
+  th{font-size:11px;letter-spacing:.04em;text-transform:uppercase;color:var(--mut);font-weight:600}
+  td.r,th.r{text-align:right;font-variant-numeric:tabular-nums}
+  tr:last-child td{border-bottom:0}
+  .empty{color:var(--mut);text-align:center;padding:22px;font-size:14px}
+  .foot{font-size:12px;color:var(--dim);margin-top:22px;text-align:center}
+  /* skeleton */
+  .sk{background:linear-gradient(90deg,rgba(255,255,255,.05) 25%,rgba(255,255,255,.11) 37%,rgba(255,255,255,.05) 63%);background-size:900px 100%;animation:shimmer 1.4s infinite linear;border-radius:12px}
+  /* connect */
+  .connect{max-width:460px;margin:6vh auto 0;text-align:center}
+  .connect .glow{width:60px;height:60px;border-radius:18px;margin:0 auto 18px;display:flex;align-items:center;justify-content:center;font-size:26px;color:#04140f;background:linear-gradient(135deg,var(--teal),var(--teal2));box-shadow:0 10px 40px -6px var(--tglow)}
+  .connect h1{font-size:22px;margin:0 0 8px}
+  .connect p{color:var(--mut);margin:0 0 20px;font-size:14.5px}
+  .crow{display:flex;gap:9px}
+  .crow input{flex:1;min-width:0;padding:13px 15px;border-radius:12px;border:1px solid var(--bd2);background:rgba(255,255,255,.04);color:var(--tx);font-size:16px;text-transform:uppercase;letter-spacing:.05em;outline:none;transition:border-color .2s,box-shadow .2s}
+  .crow input:focus{border-color:var(--teal);box-shadow:0 0 0 3px var(--tglow)}
+  .crow button{padding:13px 22px;border:0;border-radius:12px;font-weight:700;font-size:15px;color:#04140f;background:linear-gradient(135deg,var(--teal),var(--teal2));cursor:pointer;transition:transform .15s,box-shadow .25s;box-shadow:0 6px 22px -6px var(--tglow)}
+  .crow button:hover{transform:translateY(-1px);box-shadow:0 10px 30px -6px var(--tglow)}
+  .crow button:disabled{opacity:.6;cursor:default;transform:none}
+  .cmsg{margin-top:12px;font-size:13px;color:var(--mut);min-height:18px}
+  .err{background:rgba(255,107,107,.08);border:1px solid rgba(255,107,107,.3);color:#ffb4b4;border-radius:14px;padding:16px;font-size:14px}
 </style>
 </head>
 <body>
 <div class="wrap">
-  <h1>Mi Organización <span style="color:var(--teal)">— FENIX</span></h1>
-  <p class="sub">Tu downline · su avance de licenciamiento · pending business · puntos</p>
-  <div class="me" id="me">Cargando…</div>
-  <div id="content"></div>
+  <div class="top">
+    <div class="brand">Mi Organización <b>· FENIX</b></div>
+    <span class="live" id="live" style="display:none"><span class="dot"></span><span id="liveTx">en vivo</span></span>
+  </div>
+  <div id="app"></div>
   <div class="foot" id="foot"></div>
 </div>
 <script>
 const P=new URLSearchParams(location.search);
-const qs = (P.get("agent") ? "agent="+encodeURIComponent(P.get("agent")) : (P.get("email")?"email="+encodeURIComponent(P.get("email")):"")) + (P.get("location")?"&location="+encodeURIComponent(P.get("location")):"") + (P.get("name")?"&name="+encodeURIComponent(P.get("name")):"");
+const qs=(P.get("agent")?"agent="+encodeURIComponent(P.get("agent")):(P.get("email")?"email="+encodeURIComponent(P.get("email")):""))+(P.get("location")?"&location="+encodeURIComponent(P.get("location")):"")+(P.get("name")?"&name="+encodeURIComponent(P.get("name")):"");
+const $=id=>document.getElementById(id);
 const money=n=>"$"+Math.round(n).toLocaleString("en-US");
 const esc=s=>String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;"}[c]));
-function badge(n){n=n||"";const phase= /Completada|Inforce|Completado/.test(n)?4:0; return n;}
-function stg(phase,stageName,status){if(status==="lost"||status==="abandoned")return '<span class="stg lost">'+(status==="lost"?"Caído":"Abandonado")+'</span>';return '<span class="stg p'+(phase||1)+'">'+esc(stageName||"—")+'</span>';}
-function nodes(list){if(!list||!list.length)return"";let h='<ul class="tree">';list.forEach((k,i)=>{const has=k.children&&k.children.length;const id="n"+Math.random().toString(36).slice(2);
-  h+='<li class="node"><div class="row"><span class="tog'+(has?'':' empty')+'" data-t="'+id+'">'+(has?'+':'')+'</span><span class="nm">'+esc(k.name)+'</span>'+(k.code?'<span class="cd">'+esc(k.code)+'</span>':'<span class="cd pend">cód. pendiente</span>')+(has?'<span class="dl">'+k.children.length+' ↓</span>':'')+(k.last?'<span class="dl">'+new Date(k.last).toLocaleDateString("es",{day:"2-digit",month:"short"})+'</span>':'')+stg(k.phase,k.stageName,k.status)+'</div>'+(has?'<div data-c="'+id+'" style="display:none">'+nodes(k.children)+'</div>':'')+'</li>';});return h+'</ul>';}
-function renderConnect(location,name){
-  document.getElementById("me").textContent = name ? ("Hola "+name) : "Conecta tu cuenta";
-  document.getElementById("content").innerHTML =
-    '<div class="empty" style="text-align:left;max-width:520px;margin:0 auto">'
-    +'<h2 style="margin:0 0 6px">Conecta tu cuenta</h2>'
-    +'<p style="color:var(--muted);margin:0 0 12px">Para ver <b>tu organización</b>, ingresa tu <b>código WFG</b> una sola vez. Queda vinculado a esta cuenta para siempre.</p>'
-    +'<div style="display:flex;gap:8px;flex-wrap:wrap">'
-    +'<input id="wfg" maxlength="8" placeholder="Tu código WFG (ej. 93OKH)" style="flex:1;min-width:200px;padding:11px 12px;border:1px solid var(--line);border-radius:9px;font-size:16px;text-transform:uppercase">'
-    +'<button id="cbtn" style="padding:11px 20px;border:0;border-radius:9px;background:var(--teal);color:#fff;font-weight:700;font-size:15px;cursor:pointer">Conectar</button>'
-    +'</div><div id="cmsg" style="margin-top:10px;font-size:13px;color:var(--muted);min-height:18px"></div></div>';
-  var btn=document.getElementById("cbtn"), inp=document.getElementById("wfg"), msg=document.getElementById("cmsg");
-  var submit=async function(){
-    var v=(inp.value||"").trim().toUpperCase();
-    if(!/^[A-Z0-9]{3,8}$/.test(v)){ msg.style.color="#7c2a1a"; msg.textContent="Código inválido: 3 a 8 letras o números."; return; }
-    btn.disabled=true; msg.style.color="var(--muted)"; msg.textContent="Conectando…";
-    try{
-      var r=await fetch("/api/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({locationId:location,wfgCode:v,locationName:name})});
-      var d=await r.json();
-      if(d&&d.ok){ msg.style.color="var(--teal)"; msg.textContent="¡Listo! Cargando tu organización…"; setTimeout(load,700); }
-      else { msg.style.color="#7c2a1a"; msg.textContent=(d&&d.error)||"No se pudo conectar."; btn.disabled=false; }
-    }catch(e){ msg.style.color="#7c2a1a"; msg.textContent="Error: "+(e.message||e); btn.disabled=false; }
-  };
-  btn.onclick=submit; inp.addEventListener("keydown",function(e){if(e.key==="Enter")submit();}); inp.focus();
+const PHC=["#4aa3ff","#9d8bff","#2ee6c0","#f4b740"];
+const PHN=["Pre Licencia","Tutorías","Post Licencia","Producción"];
+const ICON={
+ users:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="9" cy="7" r="3.2"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16 4a3.2 3.2 0 0 1 0 6.4"/><path d="M18 14a6.5 6.5 0 0 1 3.5 6"/></svg>',
+ tree:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="3" width="6" height="5" rx="1"/><rect x="3" y="16" width="6" height="5" rx="1"/><rect x="15" y="16" width="6" height="5" rx="1"/><path d="M12 8v3M6 16v-2.5h12V16"/></svg>',
+ cal:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M3 9h18M8 3v4M16 3v4"/></svg>',
+ doc:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/></svg>',
+ coin:'<svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.3v9.4M14.6 9.4c0-1.1-1.2-2-2.6-2s-2.6.9-2.6 2 1.2 2 2.6 2 2.6.9 2.6 2-1.2 2-2.6 2-2.6-.9-2.6-2"/></svg>'
+};
+function initials(n){n=String(n||"").trim();if(!n||n[0]==="(")return "··";const p=n.split(/\s+/);return ((p[0]||"")[0]||"")+((p[1]||"")[0]||"");}
+function phaseColor(ph){return PHC[(ph||1)-1]||PHC[0];}
+function badge(phase,stageName,status){
+  if(status==="lost"||status==="abandoned"){const t=status==="lost"?"Caído":"Abandonado";return '<span class="badge" style="color:#ffb4b4;background:rgba(255,107,107,.12)">'+t+'</span>';}
+  const c=phaseColor(phase);return '<span class="badge" style="color:'+c+';background:'+c+'1f">'+esc(stageName||"—")+'</span>';
 }
-async function load(){
-  if(!qs){document.getElementById("me").textContent="";document.getElementById("content").innerHTML='<div class="err">Falta la identidad del agente. Abre con <b>?agent=TUCODIGO</b> o <b>?email=tucorreo</b>.</div>';return;}
+function countUp(el){const t=parseFloat(el.dataset.count||"0"),pre=el.dataset.pre||"",st=performance.now(),dur=950;
+  function tick(now){const p=Math.min(1,(now-st)/dur);const v=t*(1-Math.pow(1-p,3));el.textContent=pre+Math.round(v).toLocaleString("en-US");if(p<1)requestAnimationFrame(tick);}requestAnimationFrame(tick);}
+function rows(list,depth){if(!list||!list.length)return"";let h='<div class="rows'+(depth?' kids':'')+'">';
+  list.forEach((k,i)=>{const has=k.children&&k.children.length;const id="g"+Math.random().toString(36).slice(2);const c=phaseColor(k.phase);
+    let segs='';for(let s=1;s<=4;s++){segs+='<span class="cell">'+(s<=(k.phase||0)?'<b class="fill" style="background:'+c+'"></b>':'')+'</span>';}
+    h+='<div class="row reveal" style="animation-delay:'+(depth?0:i*55)+'ms">'
+      +'<div class="rtop"><div class="rava">'+initials(k.name)+'</div>'
+      +'<div style="min-width:0;flex:1"><div class="rname">'+esc(k.name)+(has?'<span class="tog" data-t="'+id+'">▸ '+k.children.length+'</span>':'')+'</div>'
+      +'<div class="rmeta">'+(k.code?esc(k.code):'cód. pendiente')+(k.last?' · '+new Date(k.last).toLocaleDateString("es",{day:"2-digit",month:"short"}):'')+'</div></div>'
+      +badge(k.phase,k.stageName,k.status)+'</div>'
+      +'<div class="seg">'+segs+'</div>'
+      +(has?'<div data-c="'+id+'" style="display:none">'+rows(k.children,1)+'</div>':'')+'</div>';
+  });return h+'</div>';}
+
+function skeleton(){
+  let c='<div class="cards">';for(let i=0;i<5;i++)c+='<div class="card"><div class="sk" style="height:13px;width:60%;margin-bottom:12px"></div><div class="sk" style="height:26px;width:45%"></div></div>';c+='</div>';
+  c+='<div class="sk" style="height:150px;margin-bottom:16px"></div>';
+  c+='<div class="rows">';for(let i=0;i<4;i++)c+='<div class="sk" style="height:62px"></div>';c+='</div>';
+  $("app").innerHTML=c;
+}
+
+function renderConnect(location,name){
+  $("app").innerHTML='<div class="connect reveal">'
+    +'<div class="glow">⚡</div>'
+    +'<h1>Conecta tu cuenta</h1>'
+    +'<p>Para ver <b style="color:var(--tx)">tu organización</b>, ingresa tu <b style="color:var(--tx)">código WFG</b> una sola vez. Queda vinculado a esta cuenta para siempre.</p>'
+    +'<div class="crow"><input id="wfg" maxlength="8" placeholder="TU CÓDIGO WFG (EJ. 93OKH)"><button id="cbtn">Conectar</button></div>'
+    +'<div class="cmsg" id="cmsg"></div></div>';
+  const b=$("cbtn"),inp=$("wfg"),msg=$("cmsg");
+  const go=async()=>{const v=(inp.value||"").trim().toUpperCase();
+    if(!/^[A-Z0-9]{3,8}$/.test(v)){msg.style.color="#ffb4b4";msg.textContent="Código inválido: 3 a 8 letras o números.";return;}
+    b.disabled=true;msg.style.color="var(--mut)";msg.textContent="Conectando…";
+    try{const r=await fetch("/api/connect",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({locationId:location,wfgCode:v,locationName:name})});const d=await r.json();
+      if(d&&d.ok){msg.style.color="var(--teal)";msg.textContent="¡Listo! Cargando tu organización…";setTimeout(()=>load(true),700);}
+      else{msg.style.color="#ffb4b4";msg.textContent=(d&&d.error)||"No se pudo conectar.";b.disabled=false;}
+    }catch(e){msg.style.color="#ffb4b4";msg.textContent="Error: "+(e.message||e);b.disabled=false;}};
+  b.onclick=go;inp.addEventListener("keydown",e=>{if(e.key==="Enter")go();});inp.focus();
+}
+
+function render(d){
+  const ph={1:0,2:0,3:0,4:0};(function w(l){l.forEach(k=>{if(ph[k.phase]!=null)ph[k.phase]++;if(k.children)w(k.children);});})(d.tree);
+  const pb=d.pendingBusiness,appts=(d.appointments&&d.appointments.list)||[],av=d.appointments&&d.appointments.available;
+  const prod=pb.policies.length;
+  $("live").style.display="";
+  $("liveTx").textContent="en vivo · "+new Date(d.updatedAt).toLocaleTimeString("es",{hour:"2-digit",minute:"2-digit"});
+  let h='<div class="who reveal"><div class="ava">'+esc(initials(d.agent.name))+'</div>'
+    +'<div><h1>'+esc(d.agent.name)+'</h1><div class="sub">código '+esc(d.agent.code)+'</div></div></div>';
+  h+='<div class="insight reveal" style="animation-delay:60ms"><i>✦</i><span><b>'+d.directCount+'</b> reclutas · <b>'+prod+'</b> en producción · <b>'+(pb.points>0?money(pb.points):"$0")+'</b> en puntos este mes</span></div>';
+  h+='<div class="cards">'
+    +card("users","Reclutas directos",d.directCount,"",60)
+    +card("tree","Downline total",d.downlineCount,"todos los niveles",110)
+    +card("cal","Citas próximas",av?appts.length:"—","tu calendario",160)
+    +card("doc","Pólizas",pb.count,"pending business",210)
+    +'<div class="card kpi points reveal" style="animation-delay:260ms"><div class="k"><span class="ic">'+ICON.coin+'</span>Puntos del mes</div><div class="v" data-count="'+(pb.points||0)+'" data-pre="$">$0</div><div class="hint">'+(pb.points>0?"prima anualizada":"prima sin capturar")+'</div></div>'
+    +'</div>';
+  // donut + appointments
+  h+='<div class="grid2">';
+  h+='<div class="panel reveal" style="animation-delay:120ms"><h2>Reclutas por fase</h2><div style="display:flex;align-items:center;gap:16px"><div style="position:relative;width:122px;height:122px;flex:0 0 auto"><canvas id="donut"></canvas></div>'
+    +'<div class="legend">'+PHN.map((n,i)=>'<span style="'+(ph[i+1]?'':'color:var(--dim)')+'"><i style="background:'+PHC[i]+'"></i>'+n+' <b>'+ph[i+1]+'</b></span>').join('')+'</div></div></div>';
+  h+='<div class="panel reveal" style="animation-delay:180ms"><h2>Próximas citas — tu calendario</h2>'
+    +(av?(appts.length?'<table><tbody>'+appts.slice(0,5).map(a=>'<tr><td style="color:var(--mut);white-space:nowrap">'+esc(a.start?new Date(a.start).toLocaleString("es",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"—")+'</td><td>'+esc(a.title)+'</td></tr>').join('')+'</tbody></table>':'<div class="empty">No tienes citas en los próximos días.</div>'):'<div class="empty">El calendario de esta cuenta aún no está conectado.</div>')
+    +'</div>';
+  h+='</div>';
+  // downline
+  h+='<div class="reveal" style="animation-delay:160ms"><h2>Downline — avance de licenciamiento</h2>'+(d.tree.length?rows(d.tree,0):'<div class="panel"><div class="empty">Aún no tienes reclutas con tu código como upline.</div></div>')+'</div>';
+  // pending business
+  h+='<div class="reveal" style="animation-delay:220ms"><h2 style="margin-top:22px">Pending Business — pólizas de mi organización</h2>';
+  if(!pb.policies.length)h+='<div class="panel"><div class="empty">Ninguna póliza asignada a tu código o downline todavía.</div></div>';
+  else{const ps=pb.policies.slice().sort((a,b)=>b.annual-a.annual);
+    h+='<div class="panel" style="padding:4px 6px"><table><thead><tr><th>Póliza</th><th>Etapa</th><th class="r">Prima anual</th></tr></thead><tbody>'
+      +ps.map(p=>'<tr><td>'+esc(p.name)+'</td><td style="color:var(--mut)">'+esc(p.stage)+'</td><td class="r" style="color:var(--teal);font-weight:600">'+(p.annual>0?money(p.annual):"—")+'</td></tr>').join('')
+      +'</tbody></table></div>';}
+  h+='</div>';
+  $("app").innerHTML=h;
+  // animate
+  document.querySelectorAll("[data-count]").forEach(countUp);
+  document.querySelectorAll(".tog").forEach(t=>{t.onclick=()=>{const b=document.querySelector('[data-c="'+t.dataset.t+'"]');if(!b)return;const s=b.style.display!=="none";b.style.display=s?"none":"block";t.textContent=(s?"▸ ":"▾ ")+t.textContent.replace(/[▸▾]\s*/,"");};});
+  if(window.Chart){new Chart($("donut"),{type:"doughnut",data:{labels:PHN,datasets:[{data:[ph[1],ph[2],ph[3],ph[4]],backgroundColor:PHC,borderWidth:0,hoverOffset:4}]},options:{cutout:"70%",responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},animation:{animateRotate:true,duration:900}}});}
+  $("foot").textContent="Datos en vivo desde GoHighLevel · actualizado "+new Date(d.updatedAt).toLocaleString("es");
+}
+function card(icon,label,val,hint,delay){
+  const isNum=typeof val==="number";
+  return '<div class="card kpi reveal" style="animation-delay:'+delay+'ms"><div class="k"><span class="ic">'+(ICON[icon]||'')+'</span>'+label+'</div>'
+    +'<div class="v"'+(isNum?' data-count="'+val+'"':'')+'>'+(isNum?'0':esc(val))+'</div>'+(hint?'<div class="hint">'+hint+'</div>':'')+'</div>';
+}
+
+async function load(bust){
+  if(!qs){$("app").innerHTML='<div class="err reveal">Falta la identidad del agente. Abre con <b>?agent=TUCODIGO</b>, <b>?email=tucorreo</b> o <b>?location={{location.id}}</b>.</div>';return;}
+  skeleton();
   try{
-    const r=await fetch("/api/org?"+qs);const d=await r.json();
-    if(d.error){document.getElementById("me").textContent="";document.getElementById("content").innerHTML='<div class="err">'+esc(d.error)+'</div>';return;}
-    if(d.needConnect){renderConnect(d.location||P.get("location")||"", d.locationName||P.get("name")||"");return;}
-    document.getElementById("me").textContent=d.agent.name+"  ("+d.agent.code+")";
-    const ph={1:0,2:0,3:0,4:0};(function w(l){l.forEach(k=>{if(ph[k.phase]!=null)ph[k.phase]++;if(k.children)w(k.children);});})(d.tree);
-    const pb=d.pendingBusiness;
-    const appts=(d.appointments&&d.appointments.list)||[]; const apptsAvail=d.appointments&&d.appointments.available;
-    let html='<div class="cards">'
-     +'<div class="card"><div class="k">Reclutas directos</div><div class="v">'+d.directCount+'</div></div>'
-     +'<div class="card"><div class="k">Downline total</div><div class="v">'+d.downlineCount+'</div><div class="hint">todos los niveles</div></div>'
-     +'<div class="card"><div class="k">Citas próximas</div><div class="v">'+(apptsAvail?appts.length:"—")+'</div><div class="hint">tu calendario</div></div>'
-     +'<div class="card"><div class="k">Pólizas (Pending Business)</div><div class="v">'+pb.count+'</div></div>'
-     +'<div class="card points"><div class="k">Puntos del mes</div><div class="v">'+(pb.points>0?money(pb.points):"0")+'</div><div class="hint">'+(pb.points>0?"prima anualizada":"prima sin capturar")+'</div></div>'
-     +'</div>'
-     +'<div class="phasebar"><span class="pchip">1·Pre Licencia <b>'+ph[1]+'</b></span><span class="pchip">2·Tutorías <b>'+ph[2]+'</b></span><span class="pchip">3·Post Licencia <b>'+ph[3]+'</b></span><span class="pchip">4·Pending Business <b>'+ph[4]+'</b></span></div>'
-     +'<h2>Próximas Citas — tu calendario</h2>'
-     +(apptsAvail
-        ? (appts.length
-           ? '<table><thead><tr><th>Fecha</th><th>Cita</th><th>Estado</th></tr></thead><tbody>'+appts.map(a=>'<tr><td>'+esc(a.start?new Date(a.start).toLocaleString("es",{day:"2-digit",month:"short",hour:"2-digit",minute:"2-digit"}):"—")+'</td><td>'+esc(a.title)+'</td><td>'+esc(a.status)+'</td></tr>').join("")+'</tbody></table>'
-           : '<div class="empty">No tienes citas en los próximos días.</div>')
-        : '<div class="empty">El calendario de esta cuenta aún no está conectado (falta su token de calendario).</div>')
-     +'<h2>Downline — avance de licenciamiento</h2>'+(d.tree.length?nodes(d.tree):'<div class="empty">Aún no tienes reclutas registrados con tu código como upline.</div>')
-     +'<h2>Pending Business — pólizas de mi organización</h2>';
-    if(!pb.policies.length)html+='<div class="empty">Ninguna póliza asignada a tu código o downline todavía.</div>';
-    else{pb.policies.sort((a,b)=>b.annual-a.annual);html+='<table><thead><tr><th>Póliza</th><th>Etapa</th><th class="r">Prima anual</th></tr></thead><tbody>'+pb.policies.map(p=>'<tr><td>'+esc(p.name)+'</td><td>'+esc(p.stage)+'</td><td class="r">'+(p.annual>0?money(p.annual):"—")+'</td></tr>').join("")+'</tbody></table>';}
-    document.getElementById("content").innerHTML=html;
-    document.querySelectorAll(".tog").forEach(t=>{if(t.classList.contains("empty"))return;t.onclick=()=>{const b=document.querySelector('[data-c="'+t.dataset.t+'"]');if(!b)return;const s=b.style.display!=="none";b.style.display=s?"none":"block";t.textContent=s?"+":"−";};});
-    document.getElementById("foot").innerHTML="Datos en vivo desde GoHighLevel · actualizado "+new Date(d.updatedAt).toLocaleString("es");
-  }catch(e){document.getElementById("content").innerHTML='<div class="err">Error cargando datos: '+esc(e.message||e)+'</div>';}
+    const r=await fetch("/api/org?"+qs+(bust?("&_="+Date.now()):""));const d=await r.json();
+    if(d.error){$("app").innerHTML='<div class="err reveal">'+esc(d.error)+'</div>';return;}
+    if(d.needConnect){renderConnect(d.location||P.get("location")||"",d.locationName||P.get("name")||"");return;}
+    render(d);
+  }catch(e){$("app").innerHTML='<div class="err reveal">Error cargando datos: '+esc(e.message||e)+'</div>';}
 }
 load();
 </script>
